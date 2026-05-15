@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Thin Layer — An architecture pattern at three scales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:     #F3EDDF;
+  --paper-2:   #EAE0CB;
+  --paper-3:   #DDD0B3;
+  --ink:       #1B1715;
+  --ink-2:     #4A413A;
+  --ink-3:     #7E7264;
+  --rule:      #C9BC9F;
+  --accent:    #B83A1A;
+  --accent-2:  #2B5C5A;
+  --highlight: #E8C26A;
+  --terminal:  #1A1714;
+  --term-fg:   #E8DFCB;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: multiply;
+}
+
+.page { position: relative; z-index: 2; }
+
+/* MASTHEAD */
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding: 22px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.masthead .vol b { color: var(--accent); font-weight: 500; }
+.masthead .date { letter-spacing: 0.08em; }
+
+/* HERO */
+.hero {
+  padding: 110px 48px 80px;
+  max-width: 1240px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.hero .kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 36px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero .kicker::before {
+  content: '';
+  width: 40px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(56px, 9.5vw, 132px);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  font-variation-settings: "opsz" 144;
+  margin-bottom: 44px;
+}
+.hero h1 em {
+  font-style: italic;
+  color: var(--accent);
+  font-variation-settings: "opsz" 144;
+  font-weight: 400;
+}
+
+.hero .lede {
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1.42;
+  font-weight: 400;
+  color: var(--ink-2);
+  max-width: 620px;
+  font-variation-settings: "opsz" 36;
+}
+
+.hero .meta {
+  margin-top: 56px;
+  display: flex;
+  gap: 56px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.hero .meta div span {
+  display: block;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+/* CONTENT */
+.content {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 48px 120px;
+}
+
+.section { margin-top: 100px; }
+
+.section-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.section-number::before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.section h2 {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5vw, 48px);
+  line-height: 1.04;
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  margin-bottom: 36px;
+  font-variation-settings: "opsz" 72;
+}
+.section h2 em {
+  font-style: italic;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.content p {
+  margin-bottom: 22px;
+  font-size: 17px;
+  color: var(--ink);
+}
+.content p strong { font-weight: 500; }
+
+.content .first-para::first-letter {
+  font-family: var(--font-display);
+  font-size: 76px;
+  line-height: 0.82;
+  float: left;
+  padding: 4px 14px 0 0;
+  font-weight: 500;
+  color: var(--accent);
+  font-variation-settings: "opsz" 144;
+}
+
+/* DIAGRAM CONTAINER */
+.diagram {
+  margin: 56px -32px;
+  padding: 36px 24px 28px;
+  background: var(--paper-2);
+  border-radius: 2px;
+  position: relative;
+  border: 1px solid var(--rule);
+}
+.diagram::before {
+  content: attr(data-fig);
+  position: absolute;
+  top: 12px;
+  left: 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.diagram-caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  margin-top: 20px;
+  text-align: center;
+  font-style: italic;
+}
+.diagram svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* CODE */
+pre {
+  background: var(--terminal);
+  color: var(--term-fg);
+  padding: 26px 28px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  overflow-x: auto;
+  margin: 32px 0;
+  position: relative;
+}
+pre::before {
+  content: attr(data-label);
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #6B6056;
+  text-transform: uppercase;
+}
+.com { color: #756B5F; font-style: italic; }
+.kw  { color: #E8A05A; }
+.str { color: #B5C586; }
+.cls { color: #E8C26A; }
+.fn  { color: #7AB8C8; }
+.dec { color: #C895D6; font-style: italic; }
+.acc { color: #E87858; }
+
+code.inline {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--paper-3);
+  padding: 2px 7px;
+  border-radius: 2px;
+  color: var(--ink);
+}
+
+/* PULL QUOTE */
+.pull {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3.5vw, 34px);
+  line-height: 1.22;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink);
+  border-left: 2px solid var(--accent);
+  padding: 14px 0 14px 34px;
+  margin: 56px 0;
+  font-variation-settings: "opsz" 72;
+}
+.pull cite {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 18px;
+  font-weight: 400;
+}
+
+/* CHECKLIST */
+.checklist {
+  list-style: none;
+  margin: 36px 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.checklist li {
+  display: flex;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+}
+.checklist .marker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  min-width: 60px;
+  padding-top: 3px;
+}
+.checklist .text { flex: 1; }
+.checklist .text strong {
+  font-weight: 500;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-variation-settings: "opsz" 24;
+}
+.checklist .text span {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+/* DICHOTOMY TABLE */
+.dichotomy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 36px 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.dichotomy > div {
+  padding: 22px 24px;
+  border-right: 1px solid var(--rule);
+}
+.dichotomy > div:last-child { border-right: none; }
+.dichotomy h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.dichotomy .keep h4 { color: var(--accent-2); }
+.dichotomy .drop h4 { color: var(--accent); }
+.dichotomy ul { list-style: none; }
+.dichotomy li {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 5px 0;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.dichotomy li::before {
+  content: '— ';
+  color: var(--ink-3);
+}
+
+/* FOOTER */
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 56px 48px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+footer .mark {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-style: italic;
+  color: var(--accent);
+  letter-spacing: 0;
+  text-transform: none;
+  display: block;
+  margin-bottom: 12px;
+  font-variation-settings: "opsz" 72;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 10px; }
+  .hero { padding: 60px 22px 50px; }
+  .content { padding: 0 22px 80px; }
+  .section { margin-top: 70px; }
+  .diagram { margin-left: -10px; margin-right: -10px; padding: 30px 8px 20px; }
+  .pull { padding-left: 22px; }
+  .hero .meta { flex-direction: column; gap: 18px; margin-top: 36px; }
+  .dichotomy { grid-template-columns: 1fr; }
+  .dichotomy > div { border-right: none; border-bottom: 1px solid var(--rule); }
+  .dichotomy > div:last-child { border-bottom: none; }
+  pre { font-size: 11.5px; padding: 18px 16px; }
+  footer { padding: 40px 22px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <div class="vol">Architecture Notes · <b>Vol. I</b> · No. 03</div>
+  <div class="date">On thin layers &amp; bounded contexts</div>
+</header>
+
+<section class="hero">
+  <div class="kicker">A pattern, three scales</div>
+  <h1>The thin<br>layer, <em>down to<br>the metal.</em></h1>
+  <p class="lede">An architectural shape recurs at three distances — between processes, between clients, and between the views and the inside of a single application. The discipline is the same. So is the failure mode.</p>
+  <div class="meta">
+    <div>Subject<span>API Gateway, BFF, Application Layer</span></div>
+    <div>Frame<span>Flask · SQLAlchemy · DDD</span></div>
+    <div>Posture<span>Thin, almost to a fault</span></div>
+  </div>
+</section>
+
+<main class="content">
+
+<!-- SECTION 01 -->
+<section class="section" id="s1">
+  <div class="section-number">§ 01 — The same shape, three scales</div>
+  <h2>One pattern, recurring at every <em>distance</em>.</h2>
+
+  <p class="first-para">Software architecture has fewer ideas than it lets on. The same shape — a thin intermediary sitting between a noisy outside and a structured inside — appears at three scales of distance, wearing three different names, and people argue them as if they were unrelated.</p>
+
+  <p>An <strong>API Gateway</strong> sits between many clients and many services across a network. It routes, it authenticates, it rate-limits. The internals don't know who's calling; the callers don't know who's answering.</p>
+
+  <p>A <strong>Backend for Frontend</strong> sits between <em>one</em> client and the same services. It exists because a mobile app and a desktop web app want different shapes of the same data, and forcing one API to serve both produces a shape that serves neither.</p>
+
+  <p>An <strong>Application Layer</strong> — call it use cases, application services, interactors — sits between presentation code and bounded contexts <em>inside the same process</em>. No network, no TLS, no rate limiter. But the same job: translate the outside's shape into the inside's shape, and back again.</p>
+
+  <div class="diagram" data-fig="Fig. 01 — The recurring shape">
+    <svg viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fig1-title">
+      <title id="fig1-title">The thin-layer pattern at three scales: API Gateway, BFF, and Application Layer.</title>
+
+      <defs>
+        <marker id="arr1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1 L8 5 L2 9" fill="none" stroke="#7E7264" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="arr1a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1 L8 5 L2 9" fill="none" stroke="#B83A1A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- ROW 1 — API GATEWAY -->
+      <g transform="translate(0, 20)">
+        <text x="20" y="14" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#B83A1A">01</text>
+        <text x="20" y="38" font-family="Fraunces" font-size="18" font-style="italic" fill="#1B1715">API Gateway</text>
+        <text x="20" y="58" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">across processes</text>
+        <text x="20" y="76" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">over a network</text>
+
+        <!-- Sources -->
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="190" y="12" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="27" text-anchor="middle">Web</text>
+          <rect x="190" y="40" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="55" text-anchor="middle">iOS</text>
+          <rect x="190" y="68" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="83" text-anchor="middle">Android</text>
+        </g>
+
+        <!-- Convergence arrows -->
+        <path d="M268 23 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+        <path d="M268 51 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+        <path d="M268 79 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+
+        <!-- The layer -->
+        <rect x="340" y="12" width="60" height="80" rx="2" fill="#B83A1A"/>
+        <text x="370" y="48" text-anchor="middle" font-family="Fraunces" font-size="13" font-style="italic" fill="#F3EDDF">gate-</text>
+        <text x="370" y="64" text-anchor="middle" font-family="Fraunces" font-size="13" font-style="italic" fill="#F3EDDF">way</text>
+
+        <!-- Divergence arrows -->
+        <path d="M400 51 L462 23" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 51" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 79" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+
+        <!-- Destinations -->
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="464" y="12" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="27" text-anchor="middle">Auth svc</text>
+          <rect x="464" y="40" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="55" text-anchor="middle">Orders svc</text>
+          <rect x="464" y="68" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="83" text-anchor="middle">Billing svc</text>
+        </g>
+
+        <text x="572" y="38" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">routes,</text>
+        <text x="572" y="55" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">authenticates,</text>
+        <text x="572" y="72" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">rate-limits.</text>
+      </g>
+
+      <!-- Divider -->
+      <line x1="20" y1="135" x2="660" y2="135" stroke="#C9BC9F" stroke-width="0.5" stroke-dasharray="2,4"/>
+
+      <!-- ROW 2 — BFF -->
+      <g transform="translate(0, 150)">
+        <text x="20" y="14" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#B83A1A">02</text>
+        <text x="20" y="38" font-family="Fraunces" font-size="18" font-style="italic" fill="#1B1715">BFF</text>
+        <text x="20" y="58" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">one per client</text>
+        <text x="20" y="76" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">shaped to fit</text>
+
+        <!-- Single source -->
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="190" y="40" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="55" text-anchor="middle">Mobile app</text>
+        </g>
+
+        <path d="M268 51 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+
+        <rect x="340" y="12" width="60" height="80" rx="2" fill="#B83A1A"/>
+        <text x="370" y="56" text-anchor="middle" font-family="Fraunces" font-size="13" font-style="italic" fill="#F3EDDF">BFF</text>
+
+        <path d="M400 51 L462 23" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 51" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 79" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="464" y="12" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="27" text-anchor="middle">Auth svc</text>
+          <rect x="464" y="40" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="55" text-anchor="middle">Orders svc</text>
+          <rect x="464" y="68" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="83" text-anchor="middle">Billing svc</text>
+        </g>
+
+        <text x="572" y="38" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">aggregates,</text>
+        <text x="572" y="55" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">trims fields,</text>
+        <text x="572" y="72" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">tailors shape.</text>
+      </g>
+
+      <line x1="20" y1="265" x2="660" y2="265" stroke="#C9BC9F" stroke-width="0.5" stroke-dasharray="2,4"/>
+
+      <!-- ROW 3 — APP LAYER -->
+      <g transform="translate(0, 280)">
+        <text x="20" y="14" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#B83A1A">03</text>
+        <text x="20" y="38" font-family="Fraunces" font-size="18" font-style="italic" fill="#1B1715">Application</text>
+        <text x="20" y="58" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">within a process</text>
+        <text x="20" y="76" font-family="IBM Plex Mono" font-size="10.5" fill="#7E7264">no network at all</text>
+
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="190" y="12" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="27" text-anchor="middle">Flask view</text>
+          <rect x="190" y="40" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="55" text-anchor="middle">CLI command</text>
+          <rect x="190" y="68" width="78" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="229" y="83" text-anchor="middle">Worker job</text>
+        </g>
+
+        <path d="M268 23 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+        <path d="M268 51 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+        <path d="M268 79 L330 51" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr1)"/>
+
+        <rect x="340" y="12" width="60" height="80" rx="2" fill="#B83A1A"/>
+        <text x="370" y="48" text-anchor="middle" font-family="Fraunces" font-size="13" font-style="italic" fill="#F3EDDF">app</text>
+        <text x="370" y="64" text-anchor="middle" font-family="Fraunces" font-size="13" font-style="italic" fill="#F3EDDF">svcs</text>
+
+        <path d="M400 51 L462 23" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 51" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+        <path d="M400 51 L462 79" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr1a)"/>
+
+        <g font-family="IBM Plex Sans" font-size="11" fill="#1B1715">
+          <rect x="464" y="12" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="27" text-anchor="middle">Enrollment</text>
+          <rect x="464" y="40" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="55" text-anchor="middle">Payments</text>
+          <rect x="464" y="68" width="92" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+          <text x="510" y="83" text-anchor="middle">Reporting</text>
+        </g>
+
+        <text x="572" y="38" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">orchestrates,</text>
+        <text x="572" y="55" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">opens a UoW,</text>
+        <text x="572" y="72" font-family="Fraunces" font-style="italic" font-size="11.5" fill="#4A413A">commits.</text>
+      </g>
+    </svg>
+    <div class="diagram-caption">Three names. One discipline. A thin band of routing &amp; translation, then the real work.</div>
+  </div>
+
+  <p class="pull">Same shape, different distance. The discipline doesn't change &mdash; the things you protect <em>against</em> do.<cite>— On recurring patterns</cite></p>
+
+  <p>The shared failure mode is also the same at every scale: business logic creeps inward, the thin layer fattens, and what was supposed to be a translator becomes a parallel domain — anaemic on one side, redundant on the other. The cure is the same too. Keep the layer routing-shaped, not reasoning-shaped.</p>
+</section>
+
+<!-- SECTION 02 -->
+<section class="section" id="s2">
+  <div class="section-number">§ 02 — Flask as presentation, only</div>
+  <h2>How <em>thin</em> can a Flask app actually be?</h2>
+
+  <p class="first-para">Thin enough that grepping the Flask package for <code class="inline">sqlalchemy</code> returns nothing. Thin enough that the view functions read like dispatch tables. Thin enough that deleting Flask would leave the rest of the application intact, untestably-coupled to nothing, runnable from a CLI.</p>
+
+  <p>A view should do four things, in this order: parse the HTTP request into a typed command, hand the command to an application service, receive a plain data object back, and render it. No SQLAlchemy session, no transactions, no domain rules, no model imports. A handler is five to fifteen lines.</p>
+
+  <pre data-label="flask_app / blueprints / enrollment.py"><span class="dec">@bp.post</span>(<span class="str">"/students/&lt;student_id&gt;/enroll"</span>)
+<span class="kw">def</span> <span class="fn">enroll_student</span>(student_id):
+    command = <span class="cls">EnrollStudentCommand</span>(
+        student_id=student_id,
+        course_id=request.form[<span class="str">"course_id"</span>],
+        term=request.form[<span class="str">"term"</span>],
+    )
+    <span class="kw">try</span>:
+        result = services.enrollment.<span class="fn">enroll</span>(command)
+    <span class="kw">except</span> <span class="cls">CourseFullError</span> <span class="kw">as</span> e:
+        <span class="kw">return</span> <span class="fn">render_template</span>(<span class="str">"partials/error.html"</span>, message=<span class="fn">str</span>(e)), <span class="acc">409</span>
+    <span class="kw">return</span> <span class="fn">render_template</span>(<span class="str">"partials/enrollment.html"</span>, enrollment=result)</pre>
+
+  <p>Notice what isn't there. No <code class="inline">db.session</code>. No <code class="inline">.commit()</code>. No model import. No transaction boundary. Flask doesn't know SQLAlchemy is on the path. The view's only outside contact is a function call on <code class="inline">services.enrollment</code> — an object that arrived already constructed, and could just as well have been a mock.</p>
+
+  <div class="dichotomy">
+    <div class="keep">
+      <h4>↑ Stays in Flask</h4>
+      <ul>
+        <li>request parsing (form, json, query)</li>
+        <li>routing &amp; URL → handler</li>
+        <li>response shape (html, htmx, json)</li>
+        <li>status codes &amp; redirects</li>
+        <li>session cookies, CSRF, flash</li>
+        <li>shape validation (WTForms / Pydantic)</li>
+        <li>domain error → HTTP error mapping</li>
+      </ul>
+    </div>
+    <div class="drop">
+      <h4>↓ Leaves Flask</h4>
+      <ul>
+        <li>SQLAlchemy &amp; the session</li>
+        <li>business rules &amp; invariants</li>
+        <li>transaction boundaries</li>
+        <li>semantic validation</li>
+        <li>cross-context orchestration</li>
+        <li>repository code &amp; queries</li>
+        <li>Alembic &amp; migrations</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="diagram" data-fig="Fig. 02 — The layered separation">
+    <svg viewBox="0 0 680 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fig2-title">
+      <title id="fig2-title">Layered architecture with persistence concerns kept out of Flask.</title>
+
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1 L8 5 L2 9" fill="none" stroke="#7E7264" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="arr2x" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M2 2 L8 8 M8 2 L2 8" fill="none" stroke="#B83A1A" stroke-width="1.4" stroke-linecap="round"/>
+        </marker>
+      </defs>
+
+      <!-- Left annotations: HTTP world -->
+      <text x="20" y="35" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#B83A1A">HTTP IN</text>
+      <path d="M30 50 L30 120" stroke="#B83A1A" stroke-width="0.6" marker-end="url(#arr2)"/>
+      <text x="20" y="155" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#7E7264">HTML OUT</text>
+
+      <!-- LAYERS -->
+      <!-- Flask -->
+      <g>
+        <rect x="100" y="30" width="450" height="62" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="118" y="54" font-family="Fraunces" font-size="17" font-style="italic" fill="#1B1715">Flask · presentation</text>
+        <text x="118" y="74" font-family="IBM Plex Sans" font-size="12" fill="#4A413A">parses requests, renders templates, maps errors to status codes</text>
+        <text x="535" y="64" font-family="IBM Plex Mono" font-size="9.5" text-anchor="end" fill="#7E7264" letter-spacing="0.5">no sqlalchemy</text>
+      </g>
+
+      <!-- Application -->
+      <g>
+        <rect x="100" y="106" width="450" height="62" rx="2" fill="#EAE0CB" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="118" y="130" font-family="Fraunces" font-size="17" font-style="italic" fill="#1B1715">Application services · orchestration</text>
+        <text x="118" y="150" font-family="IBM Plex Sans" font-size="12" fill="#4A413A">opens unit of work, calls into contexts, returns plain DTOs</text>
+        <text x="535" y="140" font-family="IBM Plex Mono" font-size="9.5" text-anchor="end" fill="#7E7264" letter-spacing="0.5">thin coordinator</text>
+      </g>
+
+      <!-- Domain / bounded contexts -->
+      <g>
+        <rect x="100" y="182" width="450" height="100" rx="2" fill="#DDD0B3" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="118" y="206" font-family="Fraunces" font-size="17" font-style="italic" fill="#1B1715">Bounded contexts · domain</text>
+        <text x="118" y="226" font-family="IBM Plex Sans" font-size="12" fill="#4A413A">aggregates, value objects, invariants — the rules of the world</text>
+        <!-- Sub-boxes for contexts -->
+        <rect x="118" y="240" width="120" height="28" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.5"/>
+        <text x="178" y="258" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#1B1715">Enrollment</text>
+        <rect x="246" y="240" width="120" height="28" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.5"/>
+        <text x="306" y="258" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#1B1715">Payments</text>
+        <rect x="374" y="240" width="120" height="28" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.5"/>
+        <text x="434" y="258" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#1B1715">Reporting</text>
+      </g>
+
+      <!-- Persistence -->
+      <g>
+        <rect x="100" y="296" width="450" height="58" rx="2" fill="#B83A1A" stroke="#B83A1A" stroke-width="0.6"/>
+        <text x="118" y="320" font-family="Fraunces" font-size="17" font-style="italic" fill="#F3EDDF">Persistence · repositories &amp; UoW</text>
+        <text x="118" y="340" font-family="IBM Plex Sans" font-size="12" fill="#EAE0CB">wraps SQLAlchemy session, owns transactions</text>
+      </g>
+
+      <!-- DATABASE_URL annotation -->
+      <text x="568" y="320" font-family="IBM Plex Mono" font-size="10" fill="#B83A1A">DATABASE_URL</text>
+      <text x="568" y="334" font-family="IBM Plex Mono" font-size="10" fill="#B83A1A">env →</text>
+      <path d="M635 327 L560 327" stroke="#B83A1A" stroke-width="0.6" marker-end="url(#arr2)" fill="none"/>
+
+      <!-- Crossed-out arrow from DB_URL up to Flask -->
+      <path d="M650 50 L650 320" stroke="#C9BC9F" stroke-width="0.6" stroke-dasharray="3,3" fill="none"/>
+      <line x1="640" y1="170" x2="660" y2="190" stroke="#B83A1A" stroke-width="1.4"/>
+      <line x1="640" y1="190" x2="660" y2="170" stroke="#B83A1A" stroke-width="1.4"/>
+      <text x="650" y="380" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B83A1A">never</text>
+      <text x="650" y="394" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B83A1A">leaks up</text>
+    </svg>
+    <div class="diagram-caption">The database URL lives at one end of the stack. It does not climb.</div>
+  </div>
+</section>
+
+<!-- SECTION 03 -->
+<section class="section" id="s3">
+  <div class="section-number">§ 03 — The composition root</div>
+  <h2>Where the database URL <em>does</em> live.</h2>
+
+  <p class="first-para">If Flask doesn't know about the database, and the domain doesn't know about the database, who does? A third thing, with no other job: the <strong>composition root</strong>. It reads the environment, builds the engine, builds the repositories, builds the application services, and hands the finished objects to whoever needs them. Flask is one such recipient. A CLI is another. A worker is another.</p>
+
+  <p>This is the inversion that makes the whole thing work. Configuration doesn't flow into the framework — services flow out of the wiring code, and the framework receives them already-constructed. The framework is downstream of configuration, not the source of it.</p>
+
+  <div class="diagram" data-fig="Fig. 03 — The composition root">
+    <svg viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fig3-title">
+      <title id="fig3-title">Composition root: environment configuration enters a single wiring point that builds services for multiple consumers.</title>
+
+      <defs>
+        <marker id="arr3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1 L8 5 L2 9" fill="none" stroke="#7E7264" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="arr3a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1 L8 5 L2 9" fill="none" stroke="#B83A1A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <!-- LEFT: env vars -->
+      <text x="20" y="30" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#B83A1A">ENVIRONMENT</text>
+      <g font-family="IBM Plex Mono" font-size="11" fill="#1B1715">
+        <rect x="20" y="48" width="150" height="26" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="30" y="65">DATABASE_URL</text>
+        <rect x="20" y="80" width="150" height="26" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="30" y="97">REDIS_URL</text>
+        <rect x="20" y="112" width="150" height="26" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="30" y="129">SMTP_HOST</text>
+      </g>
+
+      <!-- arrow to composition root -->
+      <path d="M170 91 L240 162" stroke="#7E7264" stroke-width="0.6" fill="none" marker-end="url(#arr3)"/>
+
+      <!-- CENTER: composition root -->
+      <g>
+        <rect x="240" y="148" width="200" height="100" rx="2" fill="#B83A1A" stroke="#B83A1A"/>
+        <text x="340" y="178" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" letter-spacing="1.4" fill="#EAE0CB">COMPOSITION ROOT</text>
+        <text x="340" y="200" text-anchor="middle" font-family="Fraunces" font-size="20" font-style="italic" fill="#F3EDDF">wsgi.py</text>
+        <text x="340" y="222" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#EAE0CB">reads env, builds engine,</text>
+        <text x="340" y="237" text-anchor="middle" font-family="IBM Plex Sans" font-size="11" fill="#EAE0CB">assembles services</text>
+      </g>
+
+      <!-- Layered build artifacts on the right -->
+      <text x="465" y="30" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#7E7264">BUILDS</text>
+      <g font-family="IBM Plex Sans" font-size="11.5" fill="#1B1715">
+        <rect x="465" y="48" width="195" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="475" y="63">create_engine(url)</text>
+        <rect x="465" y="76" width="195" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="475" y="91">sessionmaker(bind=engine)</text>
+        <rect x="465" y="104" width="195" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="475" y="119">SqlAlchemyUnitOfWork</text>
+        <rect x="465" y="132" width="195" height="22" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="475" y="147">Repositories</text>
+        <rect x="465" y="160" width="195" height="22" rx="2" fill="#EAE0CB" stroke="#B83A1A" stroke-width="0.8"/>
+        <text x="475" y="175" font-weight="500">EnrollmentService, …</text>
+      </g>
+
+      <!-- Arrow from artifacts down to consumers -->
+      <path d="M560 188 L560 270" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr3a)"/>
+      <path d="M340 252 L340 290" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr3a)"/>
+      <path d="M170 280 Q 240 280 280 295" stroke="#B83A1A" stroke-width="0.6" fill="none" marker-end="url(#arr3a)"/>
+
+      <!-- BOTTOM: consumers -->
+      <text x="20" y="270" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#7E7264">CONSUMERS</text>
+      <g font-family="IBM Plex Sans" font-size="12" fill="#1B1715">
+        <rect x="20" y="290" width="140" height="56" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="90" y="312" text-anchor="middle">Flask app</text>
+        <text x="90" y="328" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#7E7264">html / htmx / json</text>
+        <rect x="180" y="290" width="140" height="56" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="250" y="312" text-anchor="middle">Click CLI</text>
+        <text x="250" y="328" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#7E7264">admin scripts</text>
+        <rect x="340" y="290" width="140" height="56" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="410" y="312" text-anchor="middle">Background worker</text>
+        <text x="410" y="328" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#7E7264">scheduled jobs</text>
+        <rect x="500" y="290" width="140" height="56" rx="2" fill="#F3EDDF" stroke="#7E7264" stroke-width="0.6"/>
+        <text x="570" y="312" text-anchor="middle">MCP server</text>
+        <text x="570" y="328" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#7E7264">agent surface</text>
+      </g>
+    </svg>
+    <div class="diagram-caption">One wiring point. Many consumers. The framework is downstream of configuration, not the source of it.</div>
+  </div>
+
+  <p>The same <code class="inline">services</code> object reaches Flask, a Click CLI, a background worker, and an MCP server. None of them imports the database URL. None of them reaches for <code class="inline">os.environ</code>. They each accept whatever <code class="inline">build_services()</code> hands them and get on with their job.</p>
+
+  <pre data-label="core / bootstrap.py"><span class="dec">@dataclass</span>
+<span class="kw">class</span> <span class="cls">CoreConfig</span>:
+    database_url: <span class="cls">str</span>
+
+    <span class="dec">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">from_env</span>(<span class="kw">cls</span>) -&gt; <span class="str">"CoreConfig"</span>:
+        <span class="kw">return</span> <span class="fn">cls</span>(database_url=os.environ[<span class="str">"DATABASE_URL"</span>])
+
+<span class="kw">def</span> <span class="fn">build_services</span>(config: <span class="cls">CoreConfig</span>) -&gt; <span class="cls">Services</span>:
+    engine = <span class="fn">create_engine</span>(config.database_url, pool_pre_ping=<span class="kw">True</span>)
+    session_factory = <span class="fn">sessionmaker</span>(bind=engine, expire_on_commit=<span class="kw">False</span>)
+    uow_factory = <span class="kw">lambda</span>: <span class="fn">SqlAlchemyUnitOfWork</span>(session_factory)
+    <span class="kw">return</span> <span class="fn">Services</span>(
+        enrollment=<span class="fn">EnrollmentService</span>(uow_factory),
+        payments=<span class="fn">PaymentService</span>(uow_factory),
+    )</pre>
+
+  <pre data-label="wsgi.py — the only file that knows everything"><span class="com"># the composition root</span>
+core_config = <span class="cls">CoreConfig</span>.<span class="fn">from_env</span>()
+services    = <span class="fn">build_services</span>(core_config)
+app         = <span class="fn">create_app</span>(services)</pre>
+
+  <p class="pull">If your migrations require Flask to be importable, the separation isn't <em>real</em>.<cite>— A litmus test</cite></p>
+</section>
+
+<!-- SECTION 04 -->
+<section class="section" id="s4">
+  <div class="section-number">§ 04 — Litmus tests</div>
+  <h2>How you <em>know</em> it worked.</h2>
+
+  <p class="first-para">A design like this is easy to describe and harder to maintain. Persistence has a way of seeping back upward — a quick query in a view, a session attached to <code class="inline">flask.g</code>, an ORM model returned to a template that lazy-loads on a relationship attribute. Each looks innocent. Each is a return to coupling.</p>
+
+  <p>So you carry a few tests in your pocket, the kind you can run mentally before merging, and occasionally for real.</p>
+
+  <ul class="checklist">
+    <li>
+      <span class="marker">TEST 01</span>
+      <span class="text">
+        <strong>Grep the Flask package for "sqlalchemy".</strong>
+        <span>Finds nothing. Not as an import, not as a string. If it appears, persistence has leaked into the presentation tier.</span>
+      </span>
+    </li>
+    <li>
+      <span class="marker">TEST 02</span>
+      <span class="text">
+        <strong>Run <code class="inline">alembic upgrade head</code> with Flask uninstalled.</strong>
+        <span>Migrations belong to the core, not the web framework. If they need Flask on the path, the boundary is decorative, not real.</span>
+      </span>
+    </li>
+    <li>
+      <span class="marker">TEST 03</span>
+      <span class="text">
+        <strong>Write a 20-line CLI that calls an application service.</strong>
+        <span>It should be possible without importing a single thing from the <code class="inline">flask_app</code> package. If the CLI starts pulling in blueprints or request contexts, the core isn't really standalone.</span>
+      </span>
+    </li>
+    <li>
+      <span class="marker">TEST 04</span>
+      <span class="text">
+        <strong>Delete the Flask package. Do core tests still pass?</strong>
+        <span>They should. Application service tests don't run a web server — they construct a service, pass a command, assert on the returned DTO. If they break, the test was secretly testing the framework.</span>
+      </span>
+    </li>
+    <li>
+      <span class="marker">TEST 05</span>
+      <span class="text">
+        <strong>What gets returned from an application service?</strong>
+        <span>A dataclass, a Pydantic model, a plain tuple. <em>Never</em> a SQLAlchemy ORM object — those carry a live session and will lazy-load against a closed connection somewhere in a template. Fully materialised DTOs cross the boundary.</span>
+      </span>
+    </li>
+    <li>
+      <span class="marker">TEST 06</span>
+      <span class="text">
+        <strong>Could you swap Flask for FastAPI in a weekend?</strong>
+        <span>Not as a real plan — as a thought experiment. If the answer is yes, you have a presentation adapter. If the answer is "we'd have to rewrite the data access too," you have something else, and it isn't separated.</span>
+      </span>
+    </li>
+  </ul>
+
+  <p>Each of these is a small ritual. None is exotic. Together, they keep the discipline that the three diagrams above were promising. The thin layer stays thin only because someone keeps checking.</p>
+</section>
+
+<!-- CODA -->
+<section class="section">
+  <div class="section-number">Coda</div>
+  <h2>A single discipline, <em>scaled.</em></h2>
+
+  <p class="first-para">An API Gateway protects services from clients. A BFF protects services from one specific client's appetite. An Application Layer protects bounded contexts from views. The artefacts differ — Envoy versus a GraphQL BFF versus a folder of <code class="inline">.py</code> files called <code class="inline">application/</code> — but the work is the same: translate, orchestrate, don't decide.</p>
+
+  <p>The reward, when you keep it, is small and quiet: the inside of the application stops caring about the outside. You can swap Flask for FastAPI. You can run a use case from a CLI. You can mount an MCP server on the same core and let an agent drive it. The thing that was load-bearing — the domain — was never tangled with the thing that called it.</p>
+
+  <p>That's the entire pattern. A thin layer, at every scale, refusing to do the inside's job.</p>
+</section>
+
+</main>
+
+<footer>
+  <span class="mark">⁂</span>
+  Fin · Architecture Notes Vol. I · No. 03
+</footer>
+
+</div>
+</body>
+</html>
